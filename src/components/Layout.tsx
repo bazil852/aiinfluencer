@@ -8,7 +8,7 @@ import {
   Webhook,
   Menu,
   X,
-  MonitorDot
+  MonitorDot,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import GuidedTour from "./GuidedTour";
@@ -24,6 +24,8 @@ export default function Layout() {
   const [showWebhooks, setShowWebhooks] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userPlan, setUserPlan] = useState("");
+
+  const adminDomainName = "gmail.com";
 
   const handleLogout = () => {
     clearCurrentUser();
@@ -129,14 +131,16 @@ export default function Layout() {
                   <BookOpen className="h-4 w-4 mr-2" />
                   Guide
                 </button>
-                <button
-                  data-tour="admin-panel"
-                  onClick={handleAdminPanel}
-                  className="inline-flex items-center px-3 py-2 text-sm leading-4 font-medium rounded-md text-gray-500 hover:text-gray-700 focus:outline-none transition"
-                >
-                  <MonitorDot className="h-4 w-4 mr-2" />
-                  Admin Panel
-                </button>
+                {user.email.substring(user.email.indexOf('@') + 1) === adminDomainName && (
+                  <button
+                    data-tour="admin-panel"
+                    onClick={handleAdminPanel}
+                    className="inline-flex items-center px-3 py-2 text-sm leading-4 font-medium rounded-md text-gray-500 hover:text-gray-700 focus:outline-none transition"
+                  >
+                    <MonitorDot className="h-4 w-4 mr-2" />
+                    Admin Panel
+                  </button>
+                )}
                 <button
                   data-tour="settings"
                   onClick={handleSettings}
@@ -180,6 +184,15 @@ export default function Layout() {
                 <BookOpen className="h-4 w-4 mr-2 inline" />
                 Guide
               </button>
+              {user.email.substring(user.email.indexOf('@') + 1) === adminDomainName && (
+                <button
+                  onClick={handleAdminPanel}
+                  className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <MonitorDot className="h-4 w-4 mr-2 inline" />
+                  Admin Panel
+                </button>
+              )}
               <button
                 onClick={handleSettings}
                 className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
