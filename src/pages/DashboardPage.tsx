@@ -6,45 +6,8 @@ import CreateInfluencerModal from '../components/CreateInfluencerModal';
 import { useInfluencerStore } from '../store/influencerStore';
 import { Influencer } from '../types';
 import RequestInfluencerModal from '../components/RequestInfluencerModal';
+import MultiStepModal from '../components/MultiStepModal';
 
-// NEW MODAL COMPONENT
-// function RequestInfluencerModal({
-//   onClose,
-// }: {
-//   onClose: () => void;
-// }) {
-//   return (
-//     <div className="fixed inset-0 flex items-center justify-center z-50">
-//       {/* Overlay */}
-//       <div
-//         className="absolute "
-//         onClick={onClose}
-//       />
-//       {/* Modal Content */}
-//       <div className="relative bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-//         <h2 className="text-xl font-bold mb-4 text-white">Request new Influencer</h2>
-//         <p className="text-gray-600 mb-6">
-//           Something about requesting a new influencer or scheduling a call.
-//           You can customize this description as needed.
-//         </p>
-//         <div className="flex justify-end space-x-2">
-//           <button
-//             onClick={onClose}
-//             className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-//           >
-//             Cancel
-//           </button>
-//           <button
-//             onClick={onClose}
-//             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-//           >
-//             Schedule Call
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -123,9 +86,9 @@ function DashboardPage() {
           onClose={handleCloseModal}
         />
       )}
-      {/* REQUEST NEW INFLUENCER MODAL (HEADSET BUTTON) */}
       {isRequestModalOpen && (
-        <RequestInfluencerModal onClose={handleCloseRequestModal} />
+        <MultiStepModal onClose={handleCloseRequestModal}/>
+        // <RequestInfluencerModal onClose={handleCloseRequestModal} />
       )}
     </div>
   );
