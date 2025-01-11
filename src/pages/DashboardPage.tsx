@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar } from 'lucide-react';
+import { Plus, Calendar, Headset } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { InfluencerCard } from '../components/InfluencerCard';
 import CreateInfluencerModal from '../components/CreateInfluencerModal';
 import { useInfluencerStore } from '../store/influencerStore';
 import { Influencer } from '../types';
+import RequestInfluencerModal from '../components/RequestInfluencerModal';
+import MultiStepModal from '../components/MultiStepModal';
+
 
 function DashboardPage() {
   const navigate = useNavigate();
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false); // NEW state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingInfluencer, setEditingInfluencer] = useState<Influencer | null>(null);
   const { influencers, fetchInfluencers } = useInfluencerStore();
@@ -26,11 +30,27 @@ function DashboardPage() {
     setEditingInfluencer(null);
   };
 
+  const handleOpenRequestModal = () => {
+    setIsRequestModalOpen(true);
+  };
+
+  const handleCloseRequestModal = () => {
+    setIsRequestModalOpen(false);
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Your Influencers</h1>
         <div className="flex gap-2">
+        <button
+            onClick={handleOpenRequestModal}
+            data-tour="headset"
+            className="flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors"
+            title="Schedule Call"
+          >
+            <Headset size={20} />
+          </button>
           <button
             onClick={() => navigate('/planner')}
             data-tour="calendar"
@@ -65,6 +85,10 @@ function DashboardPage() {
           influencer={editingInfluencer}
           onClose={handleCloseModal}
         />
+      )}
+      {isRequestModalOpen && (
+        <MultiStepModal onClose={handleCloseRequestModal}/>
+        // <RequestInfluencerModal onClose={handleCloseRequestModal} />
       )}
     </div>
   );

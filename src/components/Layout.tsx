@@ -1,10 +1,20 @@
-import React, { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Settings, BookOpen, HelpCircle, Webhook, Menu, X } from 'lucide-react';
-import { useAuthStore } from '../store/authStore';
-import GuidedTour from './GuidedTour';
-import HeyGenSetupModal from './HeyGenSetupModal';
-import WebhookModal from './WebhookModal';
+import React, { useEffect, useState } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
+import {
+  LogOut,
+  Settings,
+  BookOpen,
+  HelpCircle,
+  Webhook,
+  Menu,
+  X,
+  MonitorDot,
+} from "lucide-react";
+import { useAuthStore } from "../store/authStore";
+import GuidedTour from "./GuidedTour";
+import HeyGenSetupModal from "./HeyGenSetupModal";
+import WebhookModal from "./WebhookModal";
+import { supabase } from "../lib/supabase";
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -13,15 +23,48 @@ export default function Layout() {
   const [showHeyGenSetup, setShowHeyGenSetup] = useState(false);
   const [showWebhooks, setShowWebhooks] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [userPlan, setUserPlan] = useState("");
+
+  const adminDomainName = "gmail.com";
 
   const handleLogout = () => {
     clearCurrentUser();
-    navigate('/login');
+    navigate("/login");
   };
 
   const handleSettings = () => {
-    navigate('/settings');
+    navigate("/settings");
   };
+
+  const handleAdminPanel = () => {
+    navigate("/admin-panel");
+  };
+
+  useEffect(() => {
+    const fetchUserPlan = async () => {
+      const session = await supabase.auth.getSession();
+
+      if (session?.data?.session?.user?.email) {
+        console.log(session.data.session.user.email);
+        const email = session.data.session.user.email.trim();
+
+        const { data, error } = await supabase
+          .from("users")
+          .select("*") // Fetch all columns
+          .eq("email", email) // Match the trimmed email
+          .single(); // Fetch a single row or return null if none is found
+
+        if (error) {
+          console.error("Error fetching user data:", error);
+        } else {
+          console.log("Fetched user data:", data);
+          setUserPlan(data.tier);
+        }
+      }
+    };
+
+    fetchUserPlan();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -30,7 +73,7 @@ export default function Layout() {
           <div className="flex justify-between h-16 items-center">
             {/* Logo */}
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate("/dashboard")}
               className="flex items-center hover:opacity-90 transition-opacity"
             >
               <img
@@ -39,8 +82,13 @@ export default function Layout() {
                 className="h-10 w-auto mr-3"
               />
               <h1 className="text-lg font-bold text-blue-600 hidden sm:block">
-                The AI Influencer
+                The AI Influencer{" "}
               </h1>
+              {userPlan && (
+                <div className="ml-3 px-2 py-1 bg-blue-600 text-blue-100 text-sm font-medium rounded-full shadow-sm">
+                  {userPlan.charAt(0).toUpperCase() + userPlan.slice(1)}
+                </div>
+              )}
             </button>
 
             {/* Hamburger Menu for Mobile */}
@@ -49,7 +97,11 @@ export default function Layout() {
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="text-gray-500 hover:text-gray-700 focus:outline-none"
               >
-                {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                {isMobileMenuOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
               </button>
             </div>
 
@@ -79,6 +131,16 @@ export default function Layout() {
                   <BookOpen className="h-4 w-4 mr-2" />
                   Guide
                 </button>
+                {user.email.substring(user.email.indexOf('@') + 1) === adminDomainName && (
+                  <button
+                    data-tour="admin-panel"
+                    onClick={handleAdminPanel}
+                    className="inline-flex items-center px-3 py-2 text-sm leading-4 font-medium rounded-md text-gray-500 hover:text-gray-700 focus:outline-none transition"
+                  >
+                    <MonitorDot className="h-4 w-4 mr-2" />
+                    Admin Panel
+                  </button>
+                )}
                 <button
                   data-tour="settings"
                   onClick={handleSettings}
@@ -122,6 +184,15 @@ export default function Layout() {
                 <BookOpen className="h-4 w-4 mr-2 inline" />
                 Guide
               </button>
+              {user.email.substring(user.email.indexOf('@') + 1) === adminDomainName && (
+                <button
+                  onClick={handleAdminPanel}
+                  className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <MonitorDot className="h-4 w-4 mr-2 inline" />
+                  Admin Panel
+                </button>
+              )}
               <button
                 onClick={handleSettings}
                 className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -146,7 +217,9 @@ export default function Layout() {
       </main>
 
       {showGuide && <GuidedTour onClose={() => setShowGuide(false)} />}
-      {showHeyGenSetup && <HeyGenSetupModal onClose={() => setShowHeyGenSetup(false)} />}
+      {showHeyGenSetup && (
+        <HeyGenSetupModal onClose={() => setShowHeyGenSetup(false)} />
+      )}
       {showWebhooks && <WebhookModal onClose={() => setShowWebhooks(false)} />}
     </div>
   );

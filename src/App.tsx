@@ -10,6 +10,8 @@ import ContentPlannerPage from './pages/ContentPlannerPage';
 import Chatbot from './components/Chatbot';
 import ApiSetupModal from './components/ApiSetupModal';
 import { useAuthStore } from './store/authStore';
+import UpdatePlan from './pages/UpdatePlan';
+import AdminPanel from './pages/AdminPanel';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((state) => state.currentUser);
@@ -72,6 +74,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin-panel"
+            element={
+              <ProtectedRoute>
+                <AdminPanel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="update-plan"
+            element={
+              <ProtectedRoute>
+                <UpdatePlan />
               </ProtectedRoute>
             }
           />
