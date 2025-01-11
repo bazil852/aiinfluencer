@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Loader2 } from 'lucide-react';
+import { MessageSquare, X, Send, Loader2, Bug, HelpCircle, Wand2, FileQuestion } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import OpenAI from 'openai';
 
@@ -8,16 +8,46 @@ interface Message {
   content: string;
 }
 
+interface ConversationStarter {
+  icon: React.ReactNode;
+  text: string;
+  prompt: string;
+}
+
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{
     role: 'assistant',
-    content: "Hey, im Casper, the friendly ghost... No i am an AI Assistant here to help you navigate the app. I can help you:\n- Navigate Our App\n- Learn To Use The AI Infuencer\n- Come Up with Content Ideas Or Writing Scripts\nOr anwser any other related questions, im here 24/7!"
+    content: "Hey, I'm Casper, the friendly ghost... No i am an AI Assistant here to help you navigate the app. How can I assist you today?"
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showTicketButton, setShowTicketButton] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentUser: user } = useAuthStore();
+
+  const conversationStarters: ConversationStarter[] = [
+    {
+      icon: <Bug className="h-5 w-5" />,
+      text: "Report a Bug",
+      prompt: "I'd like to report a bug I encountered in the app."
+    },
+    {
+      icon: <Wand2 className="h-5 w-5" />,
+      text: "AI Avatar Help",
+      prompt: "I need help with creating or managing AI avatars."
+    },
+    {
+      icon: <HelpCircle className="h-5 w-5" />,
+      text: "App Navigation",
+      prompt: "Can you help me navigate through the app's features?"
+    },
+    {
+      icon: <FileQuestion className="h-5 w-5" />,
+      text: "General Questions",
+      prompt: "I have some general questions about the platform."
+    }
+  ];
 
   const systemPrompt = `You are Casper, a friendly and helpful AI assistant for the AI Influencer app. Your personality is warm and approachable, with a touch of playful humor.
 
@@ -58,6 +88,14 @@ Always stay in character as Casper while providing accurate, helpful guidance.`;
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    // Show ticket button after 3 messages from user
+    const userMessageCount = messages.filter(m => m.role === 'user').length;
+    if (userMessageCount >= 3) {
+      setShowTicketButton(true);
+    }
+  }, [messages]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !user?.openaiApiKey) return;
@@ -90,6 +128,15 @@ Always stay in character as Casper while providing accurate, helpful guidance.`;
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleStarterClick = (prompt: string) => {
+    setInput(prompt);
+  };
+
+  const handleCreateTicket = () => {
+    // Placeholder for ticket creation functionality
+    console.log('Creating support ticket...');
   };
 
   if (!user) return null;
@@ -144,6 +191,22 @@ Always stay in character as Casper while providing accurate, helpful guidance.`;
                 </div>
               </div>
             ))}
+
+            {messages.length === 1 && (
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                {conversationStarters.map((starter, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleStarterClick(starter.prompt)}
+                    className="flex items-center gap-2 p-3 text-sm text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    {starter.icon}
+                    <span>{starter.text}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {isLoading && (
               <div className="flex justify-start">
                 <img
@@ -158,6 +221,18 @@ Always stay in character as Casper while providing accurate, helpful guidance.`;
             )}
             <div ref={messagesEndRef} />
           </div>
+
+          {showTicketButton && (
+            <div className="px-4 py-2 border-t border-gray-100">
+              <button
+                onClick={handleCreateTicket}
+                className="w-full py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <FileQuestion className="h-5 w-5" />
+                Create Support Ticket
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="border-t p-4">
             <div className="flex space-x-2">
