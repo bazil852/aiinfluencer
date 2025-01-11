@@ -1,14 +1,16 @@
 import React, { useState } from "react";
-import { Users, Star } from 'lucide-react';
+import { Users, Star, MessageSquare } from 'lucide-react';
 import UsersTable from "../components/UserTable";
 import InfluencersPanel from "../components/InfluencersPanel";
+import SupportTicketsPanel from "../components/SupportTicketsPanel";
 
 export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState<'users' | 'influencers'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'influencers' | 'tickets'>('users');
 
   const menuItems = [
     { icon: Users, label: 'Users', id: 'users' },
     { icon: Star, label: 'Influencers', id: 'influencers' },
+    { icon: MessageSquare, label: 'Support Tickets', id: 'tickets' },
   ];
 
   return (
@@ -20,7 +22,7 @@ export default function AdminPanel() {
             {menuItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id as 'users' | 'influencers')}
+                onClick={() => setActiveTab(item.id as 'users' | 'influencers' | 'tickets')}
                 className={`flex items-center space-x-3 mt-2 p-3 rounded-lg transition-colors w-full ${
                   activeTab === item.id
                     ? 'border-2 border-gray-500 bg-blue-600 text-white'
@@ -36,7 +38,13 @@ export default function AdminPanel() {
       </div>
       <main className="flex-1 ml-48 bg-gray-100 min-h-screen">
         <div className="p-8">
-          {activeTab === 'users' ? <UsersTable /> : <InfluencersPanel />}
+          {activeTab === 'users' ? (
+            <UsersTable />
+          ) : activeTab === 'influencers' ? (
+            <InfluencersPanel />
+          ) : (
+            <SupportTicketsPanel />
+          )}
         </div>
       </main>
     </div>

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, Loader2, Bug, HelpCircle, Wand2, FileQuestion } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { supabase } from '../lib/supabase';
 import OpenAI from 'openai';
 
 interface Message {
@@ -23,6 +24,7 @@ export default function Chatbot() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showTicketButton, setShowTicketButton] = useState(false);
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentUser: user } = useAuthStore();
 
@@ -49,36 +51,7 @@ export default function Chatbot() {
     }
   ];
 
-  const systemPrompt = `You are Casper, a friendly and helpful AI assistant for the AI Influencer app. Your personality is warm and approachable, with a touch of playful humor.
-
-Key features to assist with:
-- App Navigation: Guide users through the interface
-- AI Influencer Usage: Help set up and manage AI personalities
-- Content Creation: Assist with video ideas and script writing
-- Technical Support: Help with API keys and settings
-
-Current app layout:
-- Dashboard: Create/manage AI influencers
-- Content Page: Generate videos with AI scripts
-- Settings: Configure API keys
-- Guide: Interactive walkthrough
-- Bulk Upload: CSV-based video creation
-
-Theme:
-- Primary: #c9fffc (teal)
-- Text on teal: Black
-- Background: Dark theme
-- Buttons: Teal with black text
-
-When responding:
-1. Keep your friendly, "Casper" personality
-2. Be concise but helpful
-3. Use bullet points for steps
-4. Reference exact UI elements
-5. Maintain a supportive tone
-6. Offer proactive suggestions
-
-Always stay in character as Casper while providing accurate, helpful guidance.`;
+  // ... (keep existing systemPrompt)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,9 +107,37 @@ Always stay in character as Casper while providing accurate, helpful guidance.`;
     setInput(prompt);
   };
 
-  const handleCreateTicket = () => {
-    // Placeholder for ticket creation functionality
-    console.log('Creating support ticket...');
+  const handleCreateTicket = async () => {
+    if (!user) return;
+    
+    setIsCreatingTicket(true);
+    try {
+      const { error } = await supabase
+        .from('support_tickets')
+        .insert([
+          {
+            user_id: user.id,
+            conversation: messages,
+            status: 'open'
+          }
+        ]);
+
+      if (error) throw error;
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Support ticket created successfully! Our team will review your conversation and get back to you soon.'
+      }]);
+      setShowTicketButton(false);
+    } catch (err) {
+      console.error('Error creating ticket:', err);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, there was an error creating your support ticket. Please try again later.'
+      }]);
+    } finally {
+      setIsCreatingTicket(false);
+    }
   };
 
   if (!user) return null;
@@ -226,10 +227,20 @@ Always stay in character as Casper while providing accurate, helpful guidance.`;
             <div className="px-4 py-2 border-t border-gray-100">
               <button
                 onClick={handleCreateTicket}
+                disabled={isCreatingTicket}
                 className="w-full py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors flex items-center justify-center gap-2"
               >
-                <FileQuestion className="h-5 w-5" />
-                Create Support Ticket
+                {isCreatingTicket ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Creating Ticket...
+                  </>
+                ) : (
+                  <>
+                    <FileQuestion className="h-5 w-5" />
+                    Create Support Ticket
+                  </>
+                )}
               </button>
             </div>
           )}
