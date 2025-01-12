@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useContentStore } from "../store/contentStore";
 import { useInfluencerStore } from "../store/influencerStore";
+import { usePlanLimits } from '../hooks/usePlanLimits';
 import {
   Plus,
   Loader2,
@@ -22,11 +23,14 @@ export default function ContentPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
   const [showWebhooks, setShowWebhooks] = useState(false);
+  const { videoCreation: videoLimit, videosCreated, loading: limitsLoading } = usePlanLimits();
   const [selectedContents, setSelectedContents] = useState<string[]>([]);
   const { influencers } = useInfluencerStore();
   const { contents, fetchContents, refreshContents, deleteContents } =
     useContentStore();
   const influencer = influencers.find((inf) => inf.id === id);
+  const canCreateVideo = !limitsLoading && (videoLimit === -1 || videosCreated < videoLimit);
+  const videosRemaining = videoLimit === -1 ? '∞' : videoLimit - videosCreated;
 
   useEffect(() => {
     if (!influencer) {
@@ -118,7 +122,17 @@ export default function ContentPage() {
             {videosInQueue > 0 && (
               <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full flex items-center">
                 <Loader2 className="animate-spin mr-2" size={16} />
-                {videosInQueue} video{videosInQueue > 1 ? "s" : ""} in queue
+                {videosInQueue} video{videosInQueue > 1 ? "s" : ""} in queue 
+                {!limitsLoading && videoLimit !== -1 && (
+                  <span className="ml-2 text-sm">
+                    ({videosRemaining} video{videosRemaining !== 1 ? 's' : ''} remaining)
+                  </span>
+                )}
+              </div>
+            )}
+            {!canCreateVideo && !limitsLoading && (
+              <div className="bg-red-100 text-red-800 px-4 py-2 rounded-full">
+                Video limit reached
               </div>
             )}
             <button
@@ -150,15 +164,17 @@ export default function ContentPage() {
             </button>
             <button
               onClick={() => setShowBulkCreate(true)}
-              className="flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors"
+              disabled={!canCreateVideo}
+              className={`flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors ${!canCreateVideo ? 'opacity-50 cursor-not-allowed' : ''}`}
               title="Bulk Create"
             >
               <Upload size={20} />
             </button>
             <button
               onClick={() => setShowCreateForm(true)}
+              disabled={!canCreateVideo}
               data-tour="create-video"
-              className="flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors"
+              className={`flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors ${!canCreateVideo ? 'opacity-50 cursor-not-allowed' : ''}`}
               title="Create New Video"
             >
               <Plus size={20} />

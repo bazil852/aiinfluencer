@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { createUser, loginUser, logoutUser, upsertApiKeys, getApiKeys } from '../lib/supabase';
+import { createUser, loginUser, logoutUser, upsertApiKeys, getApiKeys, supabase } from '../lib/supabase';
 
 interface User {
   id: string;
@@ -21,6 +21,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setUser: async (email: string, password: string, isSignUp: boolean) => {
     try {
       if (isSignUp) {
+        // Check if user already exists
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single();
+
+        if (existingUser) {
+          throw new Error('User already exists');
+        }
+        
         const { data, needsEmailConfirmation } = await createUser(email, password);
         if (needsEmailConfirmation) {
           return { needsEmailConfirmation: true };

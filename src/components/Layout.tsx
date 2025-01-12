@@ -24,6 +24,8 @@ export default function Layout() {
   const [showWebhooks, setShowWebhooks] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userPlan, setUserPlan] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [planDetails, setPlanDetails] = useState<{plan_name: string} | null>(null);
 
   const adminDomainName = "gmail.com";
 
@@ -42,24 +44,44 @@ export default function Layout() {
 
   useEffect(() => {
     const fetchUserPlan = async () => {
-      const session = await supabase.auth.getSession();
+      setLoading(true);
+      try {
+        const session = await supabase.auth.getSession();
 
-      if (session?.data?.session?.user?.email) {
-        console.log(session.data.session.user.email);
-        const email = session.data.session.user.email.trim();
+        if (session?.data?.session?.user?.email) {
+          const email = session.data.session.user.email.trim();
 
-        const { data, error } = await supabase
-          .from("users")
-          .select("*") // Fetch all columns
-          .eq("email", email) // Match the trimmed email
-          .single(); // Fetch a single row or return null if none is found
+          const { data, error } = await supabase
+            .from("users")
+            .select("current_plan") // Only fetch the current_plan column
+            .eq("email", email) // Match the trimmed email
+            .single();
 
-        if (error) {
-          console.error("Error fetching user data:", error);
-        } else {
-          console.log("Fetched user data:", data);
-          setUserPlan(data.tier);
+          if (error) {
+            console.error("Error fetching user data:", error);
+          } else {
+            // Fetch plan details using the current_plan id
+            if (data?.current_plan) {
+              const { data: planData, error: planError } = await supabase
+                .from("plans")
+                .select("plan_name")
+                .eq("id", data.current_plan)
+                .single();
+                console.log(planData)
+              
+              if (planError) {
+                console.error("Error fetching plan details:", planError);
+              } else if (planData) {
+                setPlanDetails(planData);
+                setUserPlan(planData.plan_name);
+              }
+            }
+          }
         }
+      } catch (err) {
+        console.error("Error in fetchUserPlan:", err);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -84,9 +106,9 @@ export default function Layout() {
               <h1 className="text-lg font-bold text-blue-600 hidden sm:block">
                 The AI Influencer{" "}
               </h1>
-              {userPlan && (
+              {planDetails && (
                 <div className="ml-3 px-2 py-1 bg-blue-600 text-blue-100 text-sm font-medium rounded-full shadow-sm">
-                  {userPlan.charAt(0).toUpperCase() + userPlan.slice(1)}
+                  {planDetails.plan_name.charAt(0).toUpperCase() + planDetails.plan_name.slice(1)}
                 </div>
               )}
             </button>

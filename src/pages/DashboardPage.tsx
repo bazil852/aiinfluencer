@@ -7,6 +7,7 @@ import { useInfluencerStore } from '../store/influencerStore';
 import { Influencer } from '../types';
 import RequestInfluencerModal from '../components/RequestInfluencerModal';
 import MultiStepModal from '../components/MultiStepModal';
+import { usePlanLimits } from '../hooks/usePlanLimits';
 
 
 function DashboardPage() {
@@ -15,10 +16,13 @@ function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingInfluencer, setEditingInfluencer] = useState<Influencer | null>(null);
   const { influencers, fetchInfluencers } = useInfluencerStore();
+  const { avatars: avatarLimit, avatarsUsed, loading: limitsLoading } = usePlanLimits();
 
   useEffect(() => {
     fetchInfluencers().catch(console.error);
   }, [fetchInfluencers]);
+
+  const canCreateAvatar = !limitsLoading && (avatarLimit === -1 || avatarsUsed < avatarLimit);
 
   const handleEditInfluencer = (influencer: Influencer) => {
     setEditingInfluencer(influencer);
@@ -43,30 +47,38 @@ function DashboardPage() {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Your Influencers</h1>
         <div className="flex gap-2">
-        <button
-            onClick={handleOpenRequestModal}
-            data-tour="headset"
-            className="flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors"
-            title="Schedule Call"
-          >
-            <Headset size={20} />
-          </button>
-          <button
-            onClick={() => navigate('/planner')}
-            data-tour="calendar"
-            className="flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors"
-            title="Content Planner"
-          >
-            <Calendar size={20} />
-          </button>
-          <button
-            data-tour="create-influencer"
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors"
-            title="Create Influencer"
-          >
-            <Plus size={20} />
-          </button>
+          {canCreateAvatar ? (
+            <>
+              <button
+                onClick={handleOpenRequestModal}
+                data-tour="headset"
+                className="flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors"
+                title="Schedule Call"
+              >
+                <Headset size={20} />
+              </button>
+              <button
+                onClick={() => navigate('/planner')}
+                data-tour="calendar"
+                className="flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors"
+                title="Content Planner"
+              >
+                <Calendar size={20} />
+              </button>
+              <button
+                data-tour="create-influencer"
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center justify-center bg-[#c9fffc] text-black p-2 rounded-lg hover:bg-[#a0fcf9] transition-colors"
+                title="Create Influencer"
+              >
+                <Plus size={20} />
+              </button>
+            </>
+          ) : (
+            <div className="text-sm text-gray-500">
+              Avatar limit reached ({avatarsUsed}/{avatarLimit}). Please upgrade your plan to create more influencers.
+            </div>
+          )}
         </div>
       </div>
 

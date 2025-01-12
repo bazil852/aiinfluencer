@@ -1,8 +1,20 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { MessageSquare, X, Send, Loader2, Bug, HelpCircle, Wand2, FileQuestion } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
 import OpenAI from 'openai';
+import { useState, useRef, useEffect } from 'react';
+
+interface HighlightInfo {
+  selector: string;
+  message: string;
+}
+
+interface NavigationInfo {
+  path: string;
+  highlight?: HighlightInfo;
+}
 
 interface Message {
   role: 'user' | 'assistant';
@@ -17,6 +29,7 @@ interface ConversationStarter {
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([{
     role: 'assistant',
     content: "Hey, I'm Casper, the friendly ghost... No i am an AI Assistant here to help you navigate the app. How can I assist you today?"
@@ -26,8 +39,76 @@ export default function Chatbot() {
   const [showTicketButton, setShowTicketButton] = useState(false);
   const [isCreatingTicket, setIsCreatingTicket] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [activeHighlight, setActiveHighlight] = useState<HighlightInfo | null>(null);
   const { currentUser: user } = useAuthStore();
 
+  // Navigation mappings with highlight information
+  const navigationGuides: Record<string, NavigationInfo> = {
+    'create-influencer': {
+      path: '/dashboard',
+      highlight: {
+        selector: '[data-tour="create-influencer"]',
+        message: 'Click this + button to create a new influencer'
+      }
+    },
+    'settings': {
+      path: '/settings',
+      highlight: {
+        selector: '[data-tour="settings"]',
+        message: 'Here you can manage your API keys and account settings'
+      }
+    },
+    'planner': {
+      path: '/planner',
+      highlight: {
+        selector: '[data-tour="calendar"]',
+        message: 'Use the content planner to create multiple videos at once'
+      }
+    }
+  };
+
+  // Handle highlight cleanup
+  useEffect(() => {
+    if (activeHighlight) {
+      const element = document.querySelector(activeHighlight.selector);
+      if (element) {
+        element.classList.add(
+          'ring-4',
+          'ring-[#c9fffc]',
+          'ring-opacity-100',
+          'animate-pulse',
+          'z-[60]'
+        );
+      }
+
+      // Remove highlight after 5 seconds
+      const timer = setTimeout(() => {
+        if (element) {
+          element.classList.remove(
+            'ring-4',
+            'ring-[#c9fffc]',
+            'ring-opacity-100',
+            'animate-pulse',
+            'z-[60]'
+          );
+        }
+        setActiveHighlight(null);
+      }, 5000);
+
+      return () => {
+        clearTimeout(timer);
+        if (element) {
+          element.classList.remove(
+            'ring-4',
+            'ring-[#c9fffc]',
+            'ring-opacity-100',
+            'animate-pulse',
+            'z-[60]'
+          );
+        }
+      };
+    }
+  }, [activeHighlight]);
   const conversationStarters: ConversationStarter[] = [
     {
       icon: <Bug className="h-5 w-5" />,
@@ -69,6 +150,56 @@ export default function Chatbot() {
     }
   }, [messages]);
 
+  const systemPrompt = `You are Casper, an AI assistant for the AI Influencer platform. You can help users navigate the app and explain features.
+
+  When users ask about specific features, you should:
+  1. Provide a clear explanation
+  2. Guide them to the relevant page
+  3. Explain how to use the feature
+
+  Navigation commands you can use (use exactly these phrases):
+  - NAVIGATE_TO: dashboard
+  - NAVIGATE_TO: settings
+  - NAVIGATE_TO: planner
+  - NAVIGATE_TO: admin-panel
+
+  Example: If a user asks "How do I create an influencer?", you should:
+  1. Explain that they can create an influencer from the dashboard
+  2. Include "NAVIGATE_TO: dashboard" in your response
+  3. Explain the steps: "Click the + button in the top right, fill in the name and template ID..."
+
+  Keep responses friendly and helpful. Always offer to explain more if needed.`;
+
+  const handleNavigation = (response: string) => {
+    const navigationMatch = response.match(/NAVIGATE_TO: ([\w-]+)/);
+    console.log ("Navigate to: ",response);
+    if (navigationMatch) {
+      const destination = navigationMatch[1];
+      const cleanResponse = response.replace(/NAVIGATE_TO: [\w-]+/, '').trim();
+      
+      // Add message first
+      setMessages(prev => [...prev, { role: 'assistant', content: cleanResponse }]);
+      
+      // Navigate and show highlight if available
+      setTimeout(() => {
+        const path = navigationGuides[destination]?.path || `/${destination}`;
+        navigate(path);
+        
+        // Set highlight after a short delay to ensure navigation is complete
+        setTimeout(() => {
+          if (navigationGuides[destination]?.highlight) {
+            setActiveHighlight(navigationGuides[destination].highlight!);
+          }
+        }, 500);
+      }, 2000);
+      
+      return;
+    }
+    
+    // If no navigation, just add the message
+    setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !user?.openaiApiKey) return;
@@ -85,7 +216,7 @@ export default function Chatbot() {
       });
 
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
           ...messages.map(m => ({ role: m.role, content: m.content })),
@@ -95,8 +226,9 @@ export default function Chatbot() {
       });
 
       const assistantMessage = response.choices[0]?.message?.content || 'I apologize, but I cannot provide a response at this time.';
-      setMessages(prev => [...prev, { role: 'assistant', content: assistantMessage }]);
+      handleNavigation(assistantMessage);
     } catch (error) {
+      console.error('Chatbot error:', error);
       setMessages(prev => [...prev, { role: 'assistant', content: 'I apologize, but I encountered an error. Please try again later.' }]);
     } finally {
       setIsLoading(false);
@@ -263,6 +395,20 @@ export default function Chatbot() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+      {activeHighlight && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[59]">
+          <div 
+            className="fixed bg-white rounded-lg p-4 shadow-lg z-[61]"
+            style={{
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)'
+            }}
+          >
+            <p className="text-gray-900">{activeHighlight.message}</p>
+          </div>
         </div>
       )}
     </>

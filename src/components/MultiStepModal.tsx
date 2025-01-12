@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Smartphone, Headset, Loader2, ChevronDown } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { supabase } from "../lib/supabase";
+import { usePlanLimits } from '../hooks/usePlanLimits';
 
 interface MultiStepModalProps {
   onClose: () => void;
@@ -31,6 +32,7 @@ const VIEW_TYPES = ["Full Body", "Waist Up", "Head Shot"] as const;
 const SAMPLE_VOICE_DESCRIPTION = "The voice is of a 25 yo male. It has a deep pitch of voice and a very conversational tone. Talks at medium pace with confidence and enthusiasm like a true sales person.";
 
 export default function MultiStepModal({ onClose }: MultiStepModalProps) {
+  const imgRef = useRef<HTMLImageElement>(null);
   const [step, setStep] = useState(1);
   const [selectedOption, setSelectedOption] = useState<"optionA" | "optionB" | "">("");
   const [error, setError] = useState("");
@@ -39,11 +41,40 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { currentUser } = useAuthStore();
   const [requestId, setRequestId] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState<string | null>(null);
+  const {
+    avatars: avatarLimit,
+    avatarsUsed,
+    aiCloning: aiCloningLimit,
+    aiCloningUsed,
+    loading: limitsLoading
+  } = usePlanLimits();
+
+  useEffect(() => {
+    fetchWebhookUrl();
+  }, []);
+
+  const fetchWebhookUrl = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('webhook_influencer')
+        .select('url')
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setWebhookUrl(data.url);
+      }
+    } catch (err) {
+      console.error('Error fetching webhook URL:', err);
+    }
+  };
+  const canCreateAvatar = !limitsLoading && (avatarLimit === -1 || avatarsUsed < avatarLimit);
+  const canScheduleCall = !limitsLoading && (aiCloningLimit === -1 || aiCloningUsed < aiCloningLimit);
 
   const generatePrompt = (data: AvatarFormData) => {
-    return `${data.gender}, ${data.age} years old, ${data.description}${
-      data.background ? `, ${data.background}` : ''
-    }, ${data.viewType.toLowerCase()} view`;
+    return `${data.gender}, ${data.age} years old, ${data.description}${data.background ? `, ${data.background}` : ''
+      }, ${data.viewType.toLowerCase()} view`;
   };
 
   const [formData, setFormData] = useState<AvatarFormData>({
@@ -73,7 +104,7 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
     setStep(2);
   };
 
-    useEffect(() => {
+  useEffect(() => {
     if (!requestId) return;
 
     const interval = setInterval(async () => {
@@ -87,6 +118,7 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
           }
         );
         const data = await response.json();
+        console.log("Image Data", data)
 
         if (data.status === "Ready") {
           setImageURL(data.result.sample);
@@ -99,7 +131,7 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
 
     return () => clearInterval(interval);
   }, [requestId]);
-  
+
   const handleSubmitOptionA = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -137,6 +169,39 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
     }
   };
 
+  const getImageBlobFromImgTag = (imgElement: HTMLImageElement): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      // Create a canvas element
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // Ensure the context is not null
+      if (!ctx) {
+        reject(new Error("Failed to get 2D context from canvas"));
+        return;
+      }
+
+      // Set canvas dimensions to match the image
+      canvas.width = imgElement.naturalWidth;
+      canvas.height = imgElement.naturalHeight;
+
+      // Draw the image on the canvas
+      ctx.drawImage(imgElement, 0, 0);
+
+      // Convert the canvas content to a Blob
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error("Failed to convert canvas to Blob"));
+          }
+        },
+        "image/jpeg" // Set the desired format
+      );
+    });
+  };
+
   const handleSubmitRequest = async () => {
     if (!currentUser || !imageURL) return;
     if (!formData.voiceDescription) {
@@ -145,9 +210,12 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
     }
 
     setIsSubmitting(true);
+
+    // const imgElement = imgRef.current;
+    // if (!imgElement) throw new Error("Image element not found");
+    // const blob = await getImageBlobFromImgTag(imgElement);
+    // console.log("BLOB", blob)
     try {
-      // Send data to webhook
-      const webhookUrl = import.meta.env.VITE_REQUEST_WEBHOOK_URL;
       if (webhookUrl) {
         try {
           await fetch(webhookUrl, {
@@ -166,6 +234,29 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
         }
       }
 
+      const response = await fetch(imageURL)
+      const proxyUrl = "https://cors-anywhere.herokuapp.com/";
+      // const response = await fetch(proxyUrl + imageURL, {
+      //   method: "GET",
+      //   headers: {
+      //     Origin: "http://localhost:3000", // Replace with your app's origin if needed
+      //   },
+      // });
+      if (!response.ok) {
+        throw new Error("Failed to fetch image from URL");
+      }
+      const blob = await response.blob();
+      const fileName = `currentUser.id_${Date.now()}.jpeg`;
+
+      const { error: UploadImageError } = await supabase.storage.from("generated_images_for_influencer_reqs").upload(fileName, blob, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+      if (UploadImageError) {
+        console.error("Failed to upload directly:", UploadImageError);
+      }
+
       const { error } = await supabase
         .from('influencer_requests')
         .insert([{
@@ -177,7 +268,7 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
           view_type: formData.viewType,
           view_format: formData.viewFormat,
           voice_description: formData.voiceDescription,
-          generated_image_url: imageURL,
+          generated_image_url: fileName,
           status: 'completed'
         }]);
 
@@ -220,6 +311,12 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
         <div className="flex justify-between items-start mb-6">
           <h2 className="text-xl font-semibold text-gray-900">
             {step === 1 ? "Choose Option" : (selectedOption === "optionA" ? "Create Your AI Avatar" : "Schedule a Call")}
+            {step === 1 && !limitsLoading && avatarLimit !== -1 && (
+              <div className="ml-2 text-sm font-normal text-gray-500">
+                <div>Avatars: {avatarsUsed}/{avatarLimit === -1 ? '∞' : avatarLimit}</div>
+                <div>AI Cloning: {aiCloningUsed}/{aiCloningLimit === -1 ? '∞' : aiCloningLimit}</div>
+              </div>
+            )}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
             <X className="h-5 w-5" />
@@ -229,20 +326,34 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
         {step === 1 && (
           <div className="grid grid-cols-2 gap-4">
             <button
-              onClick={() => handleOptionSelect("optionA")}
-              className="aspect-square flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors"
+              onClick={() => canCreateAvatar && handleOptionSelect("optionA")}
+              className={`aspect-square flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg transition-colors relative ${canCreateAvatar ? 'border-gray-300 hover:border-gray-400 cursor-pointer' : 'border-gray-200 opacity-50 cursor-not-allowed'
+                }`}
             >
               <Smartphone className="h-8 w-8 mb-2 text-gray-400" />
               <span className="text-sm font-medium text-gray-900">Create Custom Avatar</span>
-              <span className="text-xs text-gray-500 mt-1">Design your own AI avatar</span>
+              <span className="text-xs text-gray-500 mt-1">
+                {canCreateAvatar
+                  ? "Design your own AI avatar"
+                  : avatarLimit === -1
+                    ? "Loading..."
+                    : "Avatar limit reached"}
+              </span>
             </button>
             <button
-              onClick={() => handleOptionSelect("optionB")}
-              className="aspect-square flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors"
+              onClick={() => canScheduleCall && handleOptionSelect("optionB")}
+              className={`aspect-square flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg transition-colors relative ${canScheduleCall ? 'border-gray-300 hover:border-gray-400 cursor-pointer' : 'border-gray-200 opacity-50 cursor-not-allowed'
+                }`}
             >
               <Headset className="h-8 w-8 mb-2 text-gray-400" />
               <span className="text-sm font-medium text-gray-900">Schedule a Call</span>
-              <span className="text-xs text-gray-500 mt-1">Talk to our team</span>
+              <span className="text-xs text-gray-500 mt-1">
+                {canScheduleCall
+                  ? "Talk to our team"
+                  : aiCloningLimit === -1
+                    ? "Loading..."
+                    : "AI Cloning limit reached"}
+              </span>
             </button>
           </div>
         )}
@@ -307,9 +418,8 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
                       className="flex items-center text-gray-600 hover:text-gray-900"
                     >
                       <ChevronDown
-                        className={`h-5 w-5 transform transition-transform ${
-                          showAdvanced ? 'rotate-180' : ''
-                        }`}
+                        className={`h-5 w-5 transform transition-transform ${showAdvanced ? 'rotate-180' : ''
+                          }`}
                       />
                       <span className="ml-2">Advanced Settings</span>
                     </button>
@@ -419,7 +529,9 @@ export default function MultiStepModal({ onClose }: MultiStepModalProps) {
                   <p className="mt-2 text-sm text-gray-500">Generating avatar...</p>
                 </div>
               ) : imageURL ? (
-                <img src={imageURL} alt="Generated Avatar" className="w-full h-full object-contain rounded-lg" />
+                <img
+                  ref={imgRef} src={imageURL} alt="Generated Avatar" className="w-full h-full object-contain rounded-lg"
+                  crossOrigin="anonymous" />
               ) : (
                 <div className="text-center">
                   <Smartphone className="mx-auto h-12 w-12 text-gray-400" />
